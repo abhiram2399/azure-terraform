@@ -2,7 +2,7 @@
 
 provider "azurerm" {
   features {}
-  subscription_id = "9734ed68-621d-47ed-babd-269110dbacb1"
+  subscription_id = "0cfe2870-d256-4119-b0a3-16293ac11bdc"
    resource_provider_registrations = "none"
 }
 
@@ -10,7 +10,7 @@ provider "azurerm" {
 # Resource Group Lookup
 # --------------------
 data "azurerm_resource_group" "rg" {
-  name = "1-17270391-playground-sandbox"
+  name = "1-db11e895-playground-sandbox"
 }
 
 # --------------------
@@ -66,46 +66,46 @@ resource "azurerm_public_ip" "appgw_pip" {
 
 
 
-# VM Scale Set
-resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
-  name                = "veera-vmms-cloud"
-  location            = data.azurerm_resource_group.rg.location
-  resource_group_name = data.azurerm_resource_group.rg.name
-  sku                 = "Standard_B2s"
-  instances           = "2"
-  admin_username = "adminuser"
-  admin_password = "Akki@12345678"
-  disable_password_authentication = false
+# # VM Scale Set
+# resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
+#   name                = "veera-vmms-cloud"
+#   location            = data.azurerm_resource_group.rg.location
+#   resource_group_name = data.azurerm_resource_group.rg.name
+#   sku                 = "Standard_B2s"
+#   instances           = "2"
+#   admin_username = "adminuser"
+#   admin_password = "Akki@12345678"
+#   disable_password_authentication = false
 
-  source_image_reference {
-    publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts"
-    version   = "latest"
-  }
+#   source_image_reference {
+#     publisher = "Canonical"
+#     offer     = "0001-com-ubuntu-server-jammy"
+#     sku       = "22_04-lts"
+#     version   = "latest"
+#   }
 
-  os_disk {
-    storage_account_type = "Standard_LRS"
-    caching              = "ReadWrite"
-  }
+#   os_disk {
+#     storage_account_type = "Standard_LRS"
+#     caching              = "ReadWrite"
+#   }
 
-  network_interface {
-    name    = "vmss-nic"
-    primary = true
+#   network_interface {
+#     name    = "vmss-nic"
+#     primary = true
 
-    ip_configuration {
-      name      = "internal"
-      primary  = true
-      subnet_id = azurerm_subnet.subnet_vmss.id
-    }
-  }
+#     ip_configuration {
+#       name      = "internal"
+#       primary  = true
+#       subnet_id = azurerm_subnet.subnet_vmss.id
+#     }
+#   }
 
-  upgrade_mode = "Automatic"
+#   upgrade_mode = "Automatic"
 
-  tags = {
-    environment = "dev"
-  }
-}
+#   tags = {
+#     environment = "dev"
+#   }
+# }
 
 
 # --------------------
@@ -226,6 +226,7 @@ resource "azurerm_monitor_autoscale_setting" "autoscale" {
     }
   }
 }
+
 resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   name                = "vmss-linux"
   location            = data.azurerm_resource_group.rg.location
@@ -236,7 +237,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
 
   admin_ssh_key {
     username   = "azureuser"
-    public_key = file("~/.ssh/id_rsa.pub")
+    public_key = file(pathexpand("~/.ssh/id_rsa.pub"))
   }
 
   source_image_reference {
@@ -257,12 +258,15 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
 
     ip_configuration {
       name      = "internal"
-      primary  = true
-      subnet_id = azurerm_subnet.vmss.id
+      primary   = true
+      subnet_id = azurerm_subnet.subnet_vmss.id
 
       # ✅ THIS enables auto registration with App Gateway
       application_gateway_backend_address_pool_ids = [
-        azurerm_application_gateway.appgw.backend_address_pool[0].id
+        one([
+          for pool in azurerm_application_gateway.appgw.backend_address_pool : pool.id
+          if pool.name == "backend-pool"
+        ])
       ]
     }
   }
